@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "cloudflare-ddns"
 version = "0.1.1"
 edition = "2021"
@@ -26,6 +26,9 @@ rand = "0.8"
 backoff = { version = "0.4", features = ["tokio"] }
 regex = "1.10"
 url = "2.5"
+num_cpus = "1.16.0"
+hostname = "0.4.0"
+mime = "0.3.17"
 
 [dev-dependencies]
 mockall = "0.11"

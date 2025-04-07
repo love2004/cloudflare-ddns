@@ -59,17 +59,6 @@ mod ddns_application_service_tests {
         }
     }
 
-    fn create_dns_record(ip: &str) -> DnsRecord {
-        DnsRecord {
-            id: Some("test_record".to_string()),
-            name: "test.example.com".to_string(),
-            record_type: "A".to_string(),
-            content: ip.to_string(),
-            ttl: 120,
-            proxied: false,
-        }
-    }
-
     #[tokio::test]
     async fn test_get_current_ip_ipv4() {
         let mut ip_mock = MockIpMock::new();

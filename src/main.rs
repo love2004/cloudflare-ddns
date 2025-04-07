@@ -10,6 +10,7 @@ use std::env;
 use std::process;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
+use actix_web::middleware::Compress;
 
 // 用於控制 DDNS 服務的全局變量
 static DDNS_CONTROL: once_cell::sync::Lazy<Arc<Mutex<Option<mpsc::Sender<()>>>>> = 
@@ -104,6 +105,9 @@ async fn main() -> std::io::Result<()> {
     // 載入 .env 檔案
     dotenv::dotenv().ok();
     
+    // 初始化健康檢查啟動時間
+    cloudflare_ddns::interfaces::api::health::init_start_time();
+    
     // 處理命令行參數
     let args: Vec<String> = env::args().collect();
     
@@ -178,7 +182,8 @@ async fn main() -> std::io::Result<()> {
         
         // 運行 Web 伺服器
         info!("Starting Web server at {}:{}", settings.server.host, settings.server.port);
-        run_server(&settings.server.host, settings.server.port).await?;
+        // 自定義優化的 Web 伺服器配置
+        run_optimized_web_server(&settings.server.host, settings.server.port).await?;
     } else if run_ddns {
         // 只運行 DDNS 服務
         return run_ddns_service().await;
@@ -196,7 +201,8 @@ async fn main() -> std::io::Result<()> {
         }
         
         info!("Starting Web server at {}:{}", settings.server.host, settings.server.port);
-        return run_server(&settings.server.host, settings.server.port).await;
+        // 使用優化的 Web 伺服器配置
+        return run_optimized_web_server(&settings.server.host, settings.server.port).await;
     }
     
     Ok(())
@@ -328,4 +334,69 @@ fn load_ddns_configs_from_env() -> Result<Vec<DdnsConfig>, String> {
     }
     
     Ok(configs)
+}
+
+/// 優化的 Web 伺服器啟動函數
+/// 
+/// 添加更多性能優化如壓縮支持和連接保持活
+async fn run_optimized_web_server(host: &str, port: u16) -> std::io::Result<()> {
+    use cloudflare_ddns::{web, App, HttpServer, Cors};
+    use cloudflare_ddns::constants::*;
+    use std::path::Path;
+    use std::time::Duration;
+    
+    let address = format!("{}:{}", host, port);
+    info!("準備在 {} 上啟動優化的 Web 伺服器", address);
+    
+    // 確保靜態文件目錄存在
+    let static_dir = Path::new(STATIC_DIR);
+    if !static_dir.exists() {
+        std::fs::create_dir_all(static_dir)?;
+        info!("Created static directory");
+    }
+    
+    // 確保index.html存在
+    let index_path = static_dir.join("index.html");
+    if !index_path.exists() {
+        info!("Static files not found, web UI may not work correctly");
+    } else {
+        info!("Found static files, web UI should be available");
+    }
+    
+    // 創建服務工廠
+    let service_factory = ServiceFactory::new();
+    let service_factory_arc = Arc::new(service_factory);
+    
+    // 初始化事件監聽系統
+    service_factory_arc.init_event_listeners().await;
+    info!("事件系統已初始化");
+    
+    // 包裝為web::Data
+    let service_factory_data = web::Data::new(service_factory_arc);
+    
+    HttpServer::new(move || {
+        // 啟用 CORS
+        let cors = Cors::default()
+            .allow_any_origin()
+            .allow_any_method()
+            .allow_any_header()
+            .max_age(3600);
+        
+        App::new()
+            .wrap(cors)
+            // 啟用內容壓縮
+            .wrap(Compress::default())
+            // 注冊服務工廠
+            .app_data(service_factory_data.clone())
+            // 配置路由
+            .configure(cloudflare_ddns::interfaces::api::configure_routes)
+            .configure(cloudflare_ddns::interfaces::web::configure_routes)
+    })
+    .keep_alive(Duration::from_secs(75)) // 設置連接保持活時間
+    .client_request_timeout(Duration::from_secs(60)) // 設置請求超時
+    .client_disconnect_timeout(Duration::from_secs(5)) // 設置斷開連接超時
+    .workers(num_cpus::get()) // 根據CPU核心數設置工作進程數
+    .bind(address)?
+    .run()
+    .await
 }

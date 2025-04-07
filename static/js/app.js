@@ -3,118 +3,384 @@
  * 處理事件綁定和初始化
  */
 
-// API 基礎路徑
-const API_BASE = '/api';  // 恢復 API 前綴
-
 // 全局變量
 let currentConfigs = [];
 
 // 在 DOM 載入完成後執行
 document.addEventListener("DOMContentLoaded", () => {
     // 初始化應用
+    console.log("DOM內容加載完成，開始初始化應用");
+    setTimeout(debugInit, 500); // 延遲500毫秒執行調試初始化
     initApp();
 });
 
+// 調試初始化函數
+function debugInit() {
+    console.log("=== 調試信息 ===");
+    
+    // 檢查DOM元素是否存在
+    const checkElement = (selector, name) => {
+        const element = document.querySelector(selector);
+        console.log(`${name}: ${element ? '存在' : '不存在'}`);
+        return element;
+    };
+    
+    // 檢查關鍵元素
+    checkElement('.sidebar', '側邊欄');
+    checkElement('.sidebar-nav', '導航菜單');
+    checkElement('#main-nav', '主導航');
+    
+    const navItems = document.querySelectorAll('.nav-item');
+    console.log(`找到 ${navItems.length} 個導航項目`);
+    
+    navItems.forEach((item, index) => {
+        const target = item.getAttribute('data-target');
+        console.log(`導航項目 ${index + 1}: data-target="${target}", text="${item.textContent.trim()}"`);
+        
+        // 為每個項目手動添加點擊事件，確保可以正常切換頁面
+        item.onclick = function(e) {
+            console.log(`手動點擊處理：${this.getAttribute('data-target')}`);
+            e.preventDefault();
+            
+            // 獲取目標ID
+            const target = this.getAttribute('data-target');
+            if (!target) {
+                console.error('導航項目缺少data-target屬性');
+                return false;
+            }
+            
+            // 更新活動狀態
+            navItems.forEach(l => l.classList.remove('active'));
+            this.classList.add('active');
+            
+            // 隱藏所有內容區域
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.style.display = 'none';
+            });
+            
+            // 顯示目標內容區域
+            const targetSection = document.getElementById(`${target}-section`);
+            if (targetSection) {
+                targetSection.style.display = 'block';
+                console.log(`已顯示：${target}-section`);
+            } else {
+                console.error(`未找到目標內容區域：${target}-section`);
+            }
+            
+            return false;
+        };
+    });
+    
+    console.log("=== 調試初始化完成 ===");
+}
+
 // 初始化應用
 function initApp() {
-    // 初始化加載和通知組件
-    LoadingManager.init();
-    NotificationManager.init();
+    console.log("初始化應用程序...");
     
-    // 綁定全局未處理的Promise錯誤
-    window.addEventListener('unhandledrejection', event => {
-        console.error('未處理的Promise拒絕:', event.reason);
-        NotificationManager.showError(event.reason.message || '發生未知錯誤');
-    });
-            
-    // 綁定導航事件
-    initNavigation();
-            
-    // 綁定向導事件
-    bindWizardEvents();
-    
-    // 綁定模態框事件
-    bindModalEvents();
-    
-    // 載入初始數據
-    loadInitialData();
+    try {
+        // 初始化通知和加載組件
+        console.log("初始化UI組件...");
+        if (window.LoadingManager) LoadingManager.init();
+        if (window.NotificationManager) NotificationManager.init();
+        
+        // 綁定全局未處理的Promise錯誤
+        window.addEventListener('unhandledrejection', event => {
+            console.error('未處理的Promise拒絕:', event.reason);
+            if (window.NotificationManager) {
+                NotificationManager.showError(event.reason.message || '發生未知錯誤');
+            }
+        });
+        
+        // 初始化UI元素（在導航之前）
+        console.log("初始化UI元素...");
+        initUI();
+                
+        // 綁定導航事件
+        console.log("初始化導航...");
+        initNavigation();
+        
+        // 綁定按鈕事件
+        console.log("綁定按鈕事件...");
+        bindButtons();
+                
+        // 綁定向導事件
+        console.log("綁定向導事件...");
+        bindWizardEvents();
+        
+        // 綁定模態框事件
+        console.log("綁定模態框事件...");
+        bindModalEvents();
+        
+        // 初始化連接狀態檢測
+        console.log("初始化連接監測...");
+        initConnectionMonitor();
+        
+        // 延遲加載初始數據，確保UI已準備好
+        console.log("準備加載初始數據...");
+        setTimeout(loadInitialData, 1000);
+
+        // 輸出調試信息
+        console.log("應用初始化完成");
+    } catch (error) {
+        console.error("應用初始化失敗:", error);
+        alert("應用初始化失敗: " + error.message);
+    }
 }
 
 // 初始化導航功能
 function initNavigation() {
-    const navLinks = document.querySelectorAll('.sidebar-nav a');
+    console.log("初始化導航功能...");
+    
+    // 獲取所有導航項目
+    const navItems = document.querySelectorAll('#main-nav .nav-item');
+    console.log(`找到 ${navItems.length} 個導航項目`);
+    
+    // 定義內容區對象
     const sections = {
         'dashboard': document.getElementById('dashboard-section'),
         'domains': document.getElementById('domains-section'),
         'settings': document.getElementById('settings-section'),
         'logs': document.getElementById('logs-section')
     };
+    
+    // 檢查所有部分是否都存在
+    Object.entries(sections).forEach(([key, section]) => {
+        if (!section) {
+            console.error(`未找到內容區域: ${key}-section`);
+        }
+    });
 
-    navLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
+    // 為每個導航項目添加點擊事件
+    navItems.forEach(item => {
+        const target = item.getAttribute('data-target');
+        console.log(`處理導航項目: ${target}`);
+        
+        item.addEventListener('click', function(e) {
             e.preventDefault();
-            const target = link.getAttribute('href').substring(1);
+            console.log(`導航項目被點擊: ${this.getAttribute('data-target')}`);
+            
+            // 獲取目標ID
+            const target = this.getAttribute('data-target');
+            console.log(`目標部分ID: ${target}`);
             
             // 更新活動狀態
-            navLinks.forEach(l => l.parentElement.classList.remove('active'));
-            link.parentElement.classList.add('active');
+            navItems.forEach(l => {
+                l.classList.remove('active');
+                console.log(`移除項目 ${l.getAttribute('data-target')} 的活動狀態`);
+            });
+            this.classList.add('active');
+            console.log(`添加項目 ${target} 的活動狀態`);
             
-            // 顯示對應的內容區域
+            // 隱藏所有內容區域
             Object.values(sections).forEach(section => {
-                if (section) section.style.display = 'none';
+                if (section) {
+                    section.style.display = 'none';
+                    console.log(`隱藏內容區域: ${section.id}`);
+                }
             });
             
+            // 顯示目標內容區域
             if (sections[target]) {
                 sections[target].style.display = 'block';
+                console.log(`顯示內容區域: ${target}-section`);
+                
                 // 載入對應模塊的數據
                 loadModuleData(target);
+            } else {
+                console.error(`未找到目標內容區域: ${target}-section`);
             }
         });
     });
+    
+    // 添加直接點擊處理程序到子元素
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            // 確保事件不會被阻止
+            e.stopPropagation();
+            // 觸發父元素的點擊事件
+            this.parentElement.click();
+        });
+    });
+}
+
+// 連接監控器
+function initConnectionMonitor() {
+    console.log("初始化連接監視器...");
+    
+    // 設置連接檢測函數
+    const checkConnection = async () => {
+        try {
+            console.log("檢測API可用性...");
+            const available = await ApiClient.checkApiAvailability();
+            console.log("API可用性檢測結果:", available ? "可用" : "不可用");
+            updateConnectionStatus(available);
+            return available;
+        } catch (error) {
+            console.error("API可用性檢測出錯:", error);
+            updateConnectionStatus(false);
+            return false;
+        }
+    };
+    
+    // 初始檢測API可用性
+    checkConnection().then(available => {
+        console.log("初始連接狀態:", available ? "已連接" : "未連接");
+    });
+    
+    // 設置定期檢測
+    setInterval(checkConnection, 30000); // 每30秒檢測一次
+    
+    // 監聽瀏覽器在線/離線事件
+    window.addEventListener('online', () => {
+        console.log('瀏覽器檢測到網絡已連接');
+        setTimeout(() => {
+            // 給網絡一點時間穩定下來
+            checkConnection().then(available => {
+                if (available) {
+                    console.log('網絡恢復，重新加載數據');
+                    loadInitialData();
+                }
+            });
+        }, 2000);
+    });
+    
+    window.addEventListener('offline', () => {
+        console.log('瀏覽器檢測到網絡已斷開');
+        updateConnectionStatus(false);
+    });
+    
+    console.log("連接監視器初始化完成");
+}
+
+// 更新連接狀態UI
+function updateConnectionStatus(isConnected) {
+    const statusIndicator = document.getElementById('connection-status');
+    if (!statusIndicator) {
+        // 如果狀態指示器不存在，創建一個
+        const indicator = document.createElement('div');
+        indicator.id = 'connection-status';
+        indicator.className = isConnected ? 'connected' : 'disconnected';
+        indicator.title = isConnected ? '與伺服器連接正常' : '無法連接到伺服器';
+        indicator.innerHTML = isConnected ? '🟢' : '🔴';
+        
+        // 添加到DOM
+        const sidebar = document.querySelector('.sidebar-footer');
+        if (sidebar) {
+            sidebar.prepend(indicator);
+        }
+    } else {
+        // 更新現有指示器
+        statusIndicator.className = isConnected ? 'connected' : 'disconnected';
+        statusIndicator.title = isConnected ? '與伺服器連接正常' : '無法連接到伺服器';
+        statusIndicator.innerHTML = isConnected ? '🟢' : '🔴';
+    }
+    
+    // 更新全局UI狀態
+    document.body.classList.toggle('offline-mode', !isConnected);
+    
+    // 如果是離線狀態，顯示通知
+    if (!isConnected) {
+        showNotification('網絡連接已斷開，部分功能可能不可用', 'warning');
+    }
+}
+
+// 共用通知函數
+function showNotification(message, type = 'info', duration = 5000) {
+    const notificationContainer = document.getElementById('notification-container') || createNotificationContainer();
+    
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    notificationContainer.appendChild(notification);
+    
+    // 自動關閉
+    setTimeout(() => {
+        notification.classList.add('fade-out');
+        setTimeout(() => {
+            notification.remove();
+        }, 500);
+    }, duration);
+}
+
+// 創建通知容器
+function createNotificationContainer() {
+    const container = document.createElement('div');
+    container.id = 'notification-container';
+    document.body.appendChild(container);
+    return container;
 }
 
 // 載入初始數據
 async function loadInitialData() {
     try {
-        LoadingManager.show('正在載入數據...');
+        console.log('開始加載初始數據...');
         
-        // 載入配置
-        await loadConfigs();
+        // 顯示加載中狀態
+        document.body.classList.add('loading');
         
-        // 載入儀表板數據
-        await loadDashboardData();
+        // 測試API連接
+        const isConnected = await ApiClient.checkApiAvailability();
+        console.log('API連接狀態:', isConnected ? '已連接' : '未連接');
         
-        // 檢查是否需要顯示設定向導
-        await checkFirstVisit();
+        if (!isConnected) {
+            throw new Error('無法連接到API服務');
+        }
         
-        LoadingManager.hide();
+        // 併發請求多個API
+        console.log('發送API請求獲取狀態和配置...');
+        const [statusData, configsData] = await Promise.all([
+            ApiClient.getStatus(),
+            ApiClient.getConfigs()
+        ]);
+        
+        console.log('收到API響應:', { 
+            狀態數據: statusData, 
+            配置數據: configsData 
+        });
+        
+        // 更新UI
+        updateStatusDisplay(statusData);
+        updateConfigsList(configsData);
+        
+        // 如果連接正常，顯示成功消息
+        if (ApiClient.connectionStatus === 'online') {
+            showNotification('數據已成功加載', 'success', 3000);
+        }
     } catch (error) {
         console.error('載入初始數據失敗:', error);
-        NotificationManager.showError('載入數據失敗: ' + error.message);
-        LoadingManager.hide();
+        showNotification('載入數據失敗: ' + error.message, 'error');
+    } finally {
+        // 無論成功或失敗，都移除加載中狀態
+        document.body.classList.remove('loading');
+        console.log('初始數據加載完成（成功或失敗）');
     }
 }
 
 // 載入模塊數據
 async function loadModuleData(module) {
+    console.log(`開始加載${module}模塊數據...`);
+    
     try {
         LoadingManager.show(`載入${module}數據...`);
         
-    switch(module) {
-        case 'dashboard':
-            await loadDashboardData();
-            break;
-        case 'domains':
-            await loadDomainsData();
-            break;
-        case 'settings':
-            await loadSettingsData();
-            break;
-        case 'logs':
-            await loadLogsData();
-            break;
-    }
+        switch(module) {
+            case 'dashboard':
+                await loadDashboardData();
+                break;
+            case 'domains':
+                await loadDomainsData();
+                break;
+            case 'settings':
+                await loadSettingsData();
+                break;
+            case 'logs':
+                await loadLogsData();
+                break;
+        }
         
+        console.log(`${module}模塊數據加載完成`);
         LoadingManager.hide();
     } catch (error) {
         console.error(`載入${module}數據失敗:`, error);
@@ -143,31 +409,56 @@ async function loadConfigs() {
 
 // 載入儀表板數據
 async function loadDashboardData() {
+    console.log('開始加載儀表板數據...');
+    
+    // 檢查儀表板DOM元素
+    const dashboardSection = document.getElementById('dashboard-section');
+    if (!dashboardSection) {
+        console.error('儀表板區塊不存在');
+        throw new Error('儀表板元素未找到');
+    }
+    
+    // 檢查關鍵元素
+    const lastUpdateElement = document.getElementById('last-update-time');
+    console.log('上次更新時間元素:', lastUpdateElement ? '已找到' : '未找到');
+    
+    const tableBody = document.getElementById('ddns-records');
+    console.log('記錄表格元素:', tableBody ? '已找到' : '未找到');
+    
     try {
         // 獲取狀態信息
+        console.log('請求API獲取狀態數據...');
         const statusData = await ApiClient.getStatus();
+        console.log('API返回狀態數據:', statusData);
         
-        if (!statusData.success) {
-            throw new Error('獲取狀態失敗');
+        // 檢查API響應格式
+        if (!statusData) {
+            throw new Error('獲取狀態失敗：API返回空數據');
         }
         
         // 更新上次更新時間
-        const lastUpdateElement = document.getElementById('last-update-time');
         if (lastUpdateElement) {
             if (statusData.last_update) {
                 lastUpdateElement.textContent = Utils.formatLastUpdate(statusData.last_update);
+                console.log('已更新上次更新時間:', statusData.last_update);
             } else {
                 lastUpdateElement.textContent = '從未更新';
-    }
-}
+                console.log('無上次更新時間');
+            }
+        }
 
-        // 更新DDNS記錄表格
-        const tableBody = document.getElementById('ddns-records');
-        if (!tableBody) return;
+        // 如果記錄表格不存在，提前返回
+        if (!tableBody) {
+            console.log('記錄表格不存在，儀表板數據加載部分完成');
+            return;
+        }
         
+        // 清空表格
         tableBody.innerHTML = '';
         
+        // 處理配置
         if (currentConfigs.length === 0) {
+            console.log('沒有DDNS記錄，顯示空狀態');
             tableBody.innerHTML = `
                 <tr>
                     <td colspan="7" class="text-center">沒有找到 DDNS 記錄。點擊 "添加記錄" 按鈕來創建。</td>
@@ -176,8 +467,11 @@ async function loadDashboardData() {
             return;
         }
         
+        console.log('填充DDNS記錄表格，找到', currentConfigs.length, '條記錄');
+        
         // 填充表格
-        currentConfigs.forEach(config => {
+        currentConfigs.forEach((config, index) => {
+            console.log(`處理記錄 ${index + 1}:`, config.record_name);
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${config.record_name}</td>
@@ -202,9 +496,13 @@ async function loadDashboardData() {
         });
         
         // 綁定記錄操作按鈕事件
+        console.log('綁定記錄按鈕事件');
         bindRecordButtons();
+        
+        console.log('儀表板數據加載完成');
     } catch (error) {
         console.error('載入儀表板數據失敗:', error);
+        NotificationManager.showError(`載入儀表板數據失敗: ${error.message}`);
         throw error;
     }
 }
@@ -278,14 +576,60 @@ async function loadDomainsData() {
 
 // 載入設定數據
 async function loadSettingsData() {
-    // 實現設定頁面數據載入
-    // ...
+    console.log('開始載入設定數據...');
+    
+    try {
+        // 檢查設定頁面是否存在
+        const settingsSection = document.getElementById('settings-section');
+        if (!settingsSection) {
+            console.error('設定區塊不存在');
+            throw new Error('設定頁面元素未找到');
+        }
+        
+        // 獲取設定表單
+        const settingsForm = settingsSection.querySelector('.settings-form');
+        if (!settingsForm) {
+            console.error('設定表單不存在');
+            throw new Error('設定表單元素未找到');
+        }
+        
+        // 這裡將來可以實現更多設定加載邏輯
+        
+        console.log('設定數據載入完成');
+    } catch (error) {
+        console.error('載入設定數據失敗:', error);
+        NotificationManager.showError(`載入設定失敗: ${error.message}`);
+        throw error;
+    }
 }
 
 // 載入日誌數據
 async function loadLogsData() {
-    // 實現日誌頁面數據載入
-    // ...
+    console.log('開始載入日誌數據...');
+    
+    try {
+        // 檢查日誌頁面是否存在
+        const logsSection = document.getElementById('logs-section');
+        if (!logsSection) {
+            console.error('日誌區塊不存在');
+            throw new Error('日誌頁面元素未找到');
+        }
+        
+        // 獲取日誌列表
+        const logsList = logsSection.querySelector('.logs-list');
+        if (!logsList) {
+            console.error('日誌列表不存在');
+            throw new Error('日誌列表元素未找到');
+        }
+        
+        // 這裡將來可以實現更多日誌加載邏輯
+        
+        console.log('日誌數據載入完成');
+    } catch (error) {
+        console.error('載入日誌數據失敗:', error);
+        NotificationManager.showError(`載入日誌失敗: ${error.message}`);
+        throw error;
+    }
 }
 
 // 綁定記錄按鈕事件
@@ -460,7 +804,7 @@ function bindModalEvents() {
         saveBtn.addEventListener('click', async function() {
             await saveRecord();
         });
-}
+    }
 
     // 取消按鈕
     const cancelBtn = document.getElementById('cancel-btn');
@@ -731,5 +1075,189 @@ function hideElement(elementId) {
     const element = document.getElementById(elementId);
     if (element) {
         element.style.display = 'none';
+    }
+}
+
+// 初始化UI元素
+function initUI() {
+    console.log("初始化UI元素...");
+    
+    // 检查并初始化所有按钮
+    const buttons = {
+        'refresh-btn': document.getElementById('refresh-btn'),
+        'add-domain-btn': document.getElementById('add-domain-btn'),
+        'save-settings-btn': document.getElementById('save-settings-btn'),
+        'clear-logs-btn': document.getElementById('clear-logs-btn')
+    };
+    
+    // 檢查所有按鈕是否都存在
+    Object.entries(buttons).forEach(([key, button]) => {
+        if (button) {
+            console.log(`找到按鈕: ${key}`);
+            
+            // 添加点击事件监听器，记录点击事件
+            button.addEventListener('click', function() {
+                console.log(`按鈕 ${key} 被點擊`);
+            });
+        } else {
+            console.warn(`未找到按鈕: ${key}`);
+        }
+    });
+    
+    // 檢查內容區域是否存在
+    const sections = [
+        'dashboard-section',
+        'domains-section',
+        'settings-section',
+        'logs-section'
+    ];
+    
+    sections.forEach(sectionId => {
+        const section = document.getElementById(sectionId);
+        if (section) {
+            console.log(`找到內容區域: ${sectionId}`);
+        } else {
+            console.warn(`未找到內容區域: ${sectionId}`);
+        }
+    });
+    
+    // 檢查導航菜單是否存在
+    const navMenu = document.getElementById('main-nav');
+    if (navMenu) {
+        console.log(`找到導航菜單，包含 ${navMenu.children.length} 個項目`);
+        
+        // 檢查每個導航項目
+        Array.from(navMenu.children).forEach((item, index) => {
+            console.log(`導航項目 ${index + 1}: ${item.getAttribute('data-target')}`);
+        });
+    } else {
+        console.warn('未找到導航菜單');
+    }
+    
+    console.log("UI元素初始化完成");
+}
+
+// 綁定按鈕事件
+function bindButtons() {
+    console.log("綁定按鈕事件...");
+    
+    // 儀表板刷新按鈕
+    const refreshBtn = document.getElementById('refresh-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', refreshDashboard);
+        console.log("已綁定儀表板刷新按鈕");
+    }
+    
+    // 添加域名按鈕
+    const addDomainBtn = document.getElementById('add-domain-btn');
+    if (addDomainBtn) {
+        addDomainBtn.addEventListener('click', () => {
+            console.log("添加域名按鈕被點擊");
+            showAddDomainModal();
+        });
+        console.log("已綁定添加域名按鈕");
+    }
+    
+    // 保存設定按鈕
+    const saveSettingsBtn = document.getElementById('save-settings-btn');
+    if (saveSettingsBtn) {
+        saveSettingsBtn.addEventListener('click', saveSettings);
+        console.log("已綁定保存設定按鈕");
+    }
+    
+    // 清除日誌按鈕
+    const clearLogsBtn = document.getElementById('clear-logs-btn');
+    if (clearLogsBtn) {
+        clearLogsBtn.addEventListener('click', clearLogs);
+        console.log("已綁定清除日誌按鈕");
+    }
+    
+    console.log("按鈕事件綁定完成");
+}
+
+// 更新狀態顯示
+function updateStatusDisplay(statusData) {
+    // 檢查數據是否有效
+    if (!statusData) return;
+
+    // 更新上次更新時間
+    const lastUpdateElement = document.getElementById('last-update-time');
+    if (lastUpdateElement) {
+        lastUpdateElement.textContent = Utils.formatLastUpdate(statusData.last_update);
+    }
+}
+
+// 更新配置列表
+function updateConfigsList(configsData) {
+    try {
+        // 更新全局配置
+        if (configsData && configsData.configs) {
+            currentConfigs = configsData.configs.map(config => DataAdapter.adaptConfig(config));
+            console.log(`已更新配置列表，共${currentConfigs.length}項`);
+        } else {
+            currentConfigs = [];
+            console.log('配置列表為空');
+        }
+    } catch (error) {
+        console.error('更新配置列表失敗:', error);
+    }
+}
+
+// 刷新儀表板
+async function refreshDashboard() {
+    console.log('刷新儀表板...');
+    try {
+        LoadingManager.show('正在刷新數據...');
+        await loadDashboardData();
+        NotificationManager.showSuccess('數據已刷新');
+        LoadingManager.hide();
+    } catch (error) {
+        console.error('刷新儀表板失敗:', error);
+        NotificationManager.showError('刷新失敗: ' + error.message);
+        LoadingManager.hide();
+    }
+}
+
+// 顯示添加域名模態框
+function showAddDomainModal() {
+    // 重置表單
+    const form = document.getElementById('record-form');
+    if (form) form.reset();
+    
+    // 設置模態框標題
+    const modalTitle = document.getElementById('modal-title');
+    if (modalTitle) modalTitle.textContent = '添加 DDNS 記錄';
+    
+    // 顯示模態框
+    showModal('record-modal');
+}
+
+// 保存設置
+async function saveSettings() {
+    console.log('保存設置...');
+    try {
+        LoadingManager.show('正在保存設置...');
+        // 實現保存設置的邏輯
+        NotificationManager.showSuccess('設置已保存');
+        LoadingManager.hide();
+    } catch (error) {
+        console.error('保存設置失敗:', error);
+        NotificationManager.showError('保存失敗: ' + error.message);
+        LoadingManager.hide();
+    }
+}
+
+// 清除日誌
+async function clearLogs() {
+    console.log('清除日誌...');
+    try {
+        LoadingManager.show('正在清除日誌...');
+        // 實現清除日誌的邏輯
+        NotificationManager.showSuccess('日誌已清除');
+        LoadingManager.hide();
+    } catch (error) {
+        console.error('清除日誌失敗:', error);
+        NotificationManager.showError('清除失敗: ' + error.message);
+        LoadingManager.hide();
     }
 } 

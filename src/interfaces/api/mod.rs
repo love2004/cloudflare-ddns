@@ -4,7 +4,7 @@ pub mod common;
 
 // API 處理器模塊
 mod config;
-mod health;
+pub mod health;
 mod ip;
 mod status;
 mod update;

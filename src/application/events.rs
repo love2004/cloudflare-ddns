@@ -5,7 +5,6 @@ use std::fmt;
 use log::{info, warn};
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::{Receiver, Sender};
-use serde_json;
 
 /// 事件類型枚舉
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -34,17 +34,6 @@ impl DnsService for TestDnsService {
 mod dns_service_tests {
     use super::*;
     
-    fn create_test_config() -> DdnsConfig {
-        DdnsConfig {
-            api_token: "test_token".to_string(),
-            zone_id: "test_zone".to_string(),
-            record_id: "test_record".to_string(),
-            record_name: "test.example.com".to_string(),
-            update_interval: 300,
-            ip_type: IpType::IPv4,
-        }
-    }
-    
     fn create_test_dns_record() -> DnsRecord {
         DnsRecord {
             id: Some("test_record".to_string()),

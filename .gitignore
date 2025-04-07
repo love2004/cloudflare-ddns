@@ -1,0 +1,14 @@
+/target
+.env
+config/ddns.json
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.tmp
+*.swp
+/node_modules
+/dist
+ddns.json

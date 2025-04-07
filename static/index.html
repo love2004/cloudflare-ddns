@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <!-- 測試標記：更新於 2025-03-28 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RustDDNS - 控制平台</title>
+    <link rel="stylesheet" href="/css/modern.css">
+    <script src="/js/app.js" defer></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 側邊導航欄 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>RustDDNS</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="active"><a href="#dashboard"><span class="icon">📊</span>儀表板</a></li>
+                    <li><a href="#domains"><span class="icon">🌐</span>域名管理</a></li>
+                    <li><a href="#settings"><span class="icon">⚙️</span>系統設定</a></li>
+                    <li><a href="#logs"><span class="icon">📝</span>操作日誌</a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <span>版本 1.0.0</span>
+            </div>
+        </aside>
+
+        <!-- 主要內容區 -->
+        <main class="content">
+            <!-- 儀表板區域 -->
+            <section id="dashboard-section" class="content-section">
+                <header class="content-header">
+                    <h2>儀表板</h2>
+                    <div class="header-actions">
+                        <button id="refresh-btn" class="btn secondary"><span class="icon">🔄</span>刷新</button>
+                    </div>
+                </header>
+
+                <!-- 狀態卡片區 -->
+                <div class="status-cards">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>系統狀態</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="status-item">
+                                <span class="status-label">運行狀態</span>
+                                <span class="status-value running">運行中</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">最後更新</span>
+                                <span class="status-value" id="last-update-time">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 域名管理區域 -->
+            <section id="domains-section" class="content-section" style="display: none;">
+                <header class="content-header">
+                    <h2>域名管理</h2>
+                    <div class="header-actions">
+                        <button id="add-domain-btn" class="btn primary"><span class="icon">➕</span>添加域名</button>
+                    </div>
+                </header>
+                <div class="domains-list">
+                    <!-- 域名列表將由 JavaScript 動態填充 -->
+                </div>
+            </section>
+
+            <!-- 系統設定區域 -->
+            <section id="settings-section" class="content-section" style="display: none;">
+                <header class="content-header">
+                    <h2>系統設定</h2>
+                    <div class="header-actions">
+                        <button id="save-settings-btn" class="btn primary"><span class="icon">💾</span>保存設定</button>
+                    </div>
+                </header>
+                <div class="settings-form">
+                    <!-- 設定表單將由 JavaScript 動態填充 -->
+                </div>
+            </section>
+
+            <!-- 操作日誌區域 -->
+            <section id="logs-section" class="content-section" style="display: none;">
+                <header class="content-header">
+                    <h2>操作日誌</h2>
+                    <div class="header-actions">
+                        <button id="clear-logs-btn" class="btn secondary"><span class="icon">🗑️</span>清除日誌</button>
+                    </div>
+                </header>
+                <div class="logs-list">
+                    <!-- 日誌列表將由 JavaScript 動態填充 -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 添加/編輯記錄的對話框 -->
+    <div class="modal" id="record-modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">添加 DDNS 記錄</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="record-form">
+                    <input type="hidden" id="record-id">
+                    <div class="form-group">
+                        <label for="zone-id">域名區域</label>
+                        <select id="zone-id" class="form-control" required>
+                            <!-- 選項將通過 JavaScript 動態加載 -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="record-name">記錄名稱</label>
+                        <input type="text" id="record-name" class="form-control" placeholder="例如: example.com 或 sub.example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ip-type">IP 類型</label>
+                        <select id="ip-type" class="form-control" required>
+                            <option value="ipv4">IPv4 (A記錄)</option>
+                            <option value="ipv6">IPv6 (AAAA記錄)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="update-interval">更新間隔 (秒)</label>
+                        <input type="number" id="update-interval" class="form-control" min="60" value="3600" required>
+                        <small class="form-text">最小值為 60 秒</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn secondary" id="cancel-btn">取消</button>
+                <button class="btn primary" id="save-btn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 設定向導對話框 -->
+    <div class="modal" id="setup-wizard-modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content wizard">
+            <div class="modal-header">
+                <h3>DDNS 設定向導</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="wizard-step" id="wizard-step-1">
+                    <h4>步驟 1: Cloudflare API令牌</h4>
+                    <p>要使用此DDNS服務，您需要Cloudflare API令牌。</p>
+                    <div class="form-group">
+                        <label for="wizard-api-token">Cloudflare API令牌</label>
+                        <input type="password" id="wizard-api-token" class="form-control" placeholder="輸入您的Cloudflare API令牌">
+                        <small class="form-text">
+                            <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank">如何獲取API令牌?</a>
+                        </small>
+                    </div>
+                    <button class="btn primary" id="wizard-validate-token">下一步</button>
+                </div>
+                
+                <div class="wizard-step" id="wizard-step-2" style="display:none">
+                    <h4>步驟 2: 設定域名信息</h4>
+                    <div class="form-group">
+                        <label for="wizard-zone-id">Cloudflare 區域ID</label>
+                        <input type="text" id="wizard-zone-id" class="form-control" placeholder="例如: 1a2b3c4d5e6f7g8h9i0j">
+                        <small class="form-text">在Cloudflare儀表板的概覽頁面可以找到區域ID</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="wizard-record-name">記錄名稱</label>
+                        <input type="text" id="wizard-record-name" class="form-control" placeholder="例如: ddns.example.com">
+                        <small class="form-text">您想要動態更新的完整域名</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="wizard-record-id">DNS記錄ID</label>
+                        <input type="text" id="wizard-record-id" class="form-control" placeholder="例如: 1a2b3c4d5e6f7g8h9i0j">
+                        <small class="form-text">在Cloudflare DNS管理頁面編輯記錄時可以在URL中找到記錄ID</small>
+                    </div>
+                    <button class="btn secondary" id="wizard-back-step-1">上一步</button>
+                    <button class="btn primary" id="wizard-next-step-3">下一步</button>
+                </div>
+                
+                <div class="wizard-step" id="wizard-step-3" style="display:none">
+                    <h4>步驟 3: 設定DDNS選項</h4>
+                    <div class="form-group">
+                        <label>IP類型</label>
+                        <div class="radio-group">
+                            <label>
+                                <input type="radio" name="wizard-ip-type" value="ipv4" checked> IPv4 (A記錄)
+                            </label>
+                            <label>
+                                <input type="radio" name="wizard-ip-type" value="ipv6"> IPv6 (AAAA記錄)
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="wizard-update-interval">更新間隔 (秒)</label>
+                        <input type="number" id="wizard-update-interval" class="form-control" min="60" value="300">
+                        <small class="form-text">DDNS自動更新的間隔時間，建議至少60秒以上</small>
+                    </div>
+                    
+                    <button class="btn secondary" id="wizard-back-step-2">上一步</button>
+                    <button class="btn primary" id="wizard-finish">完成設定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="/js/utils.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html> 

@@ -1,0 +1,18 @@
+[
+  {
+    "api_token": "your_cloudflare_api_token",
+    "zone_id": "your_cloudflare_zone_id",
+    "record_id": "your_cloudflare_record_id",
+    "record_name": "your.domain.com",
+    "update_interval": 300,
+    "ip_type": "ipv4"
+  },
+  {
+    "api_token": "your_cloudflare_api_token_for_ipv6",
+    "zone_id": "your_cloudflare_zone_id_for_ipv6",
+    "record_id": "your_cloudflare_record_id_for_ipv6",
+    "record_name": "example.com",
+    "update_interval": 300,
+    "ip_type": "ipv6"
+  }
+] 
